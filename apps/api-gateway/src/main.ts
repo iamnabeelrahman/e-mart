@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import morgan from 'morgan';
 import proxy from 'express-http-proxy';
 import swaggerUi from 'swagger-ui-express';
@@ -18,10 +18,10 @@ app.use(
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   })
 );
-app.use(cookieParser());
+app.use(morgan('dev'));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
-app.use(morgan('dev'));
+app.use(cookieParser());
 
 app.set('trust proxy', 1);
 
@@ -32,7 +32,7 @@ const limiter = rateLimit({
   message: `Too many requests, please try again later!`,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) => req.ip
+  keyGenerator: (req: any) => ipKeyGenerator(req), // Use the proper helper
 });
 
 app.use(limiter);
@@ -76,16 +76,17 @@ const swaggerDocument = {
     },
   },
 };
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 app.get('/gateway-health', (req, res) => {
   res.send({ message: 'Welcome to API Gateway!' });
 });
 
-app.use("/", proxy(`http://localhost:6000`)) 
+app.use('/', proxy(`http://localhost:6000`));
 
 const server = app.listen(port, () => {
   console.log(`Listening at http://localhost:${port}/api`);
 });
+
 server.on('error', console.error);
